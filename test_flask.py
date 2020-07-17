@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 from PIL import Image
-from flask import Flask, request, render_template, json
+from flask import Flask, request, render_template, json, send_file
 from matplotlib import image
 from tensorflow.python.keras.models import load_model
 from flask_cors import CORS, cross_origin
@@ -19,9 +19,9 @@ def home():
     return render_template('index.html')
 
 
-@app.route('/postImage', methods=['POST'])
+@app.route('/postImage/<string:model>', methods=['POST'])
 @cross_origin()
-def post_image():
+def post_image(model):
     if request.method == 'POST':
         f = request.files['file']
         f.save('images/' + f.filename)
@@ -30,9 +30,9 @@ def post_image():
             im = Image.open(image_path)
             t, e = os.path.splitext(image_path)
             im_resize = im.resize((64, 64), Image.ANTIALIAS).convert('RGB')
-            model = load_model("models/mpl100epochs/model.keras.keras")
+            str = "models/%s/model.keras.keras" %model
+            model = load_model(str)
             result = imageClassification(im_resize, model)
-            print(result)
             response = app.response_class(
                 response=json.dumps(result),
                 status=200,
@@ -47,26 +47,36 @@ def get_results():
         print('GET RESULTS')
 
 
-# @app.route('/success', methods=['POST'])
-# def success():
-#     if request.method == 'POST':
-#         f = request.files['file']
-#         f.save('images/' + f.filename)
-#         image_path = 'images/' + f.filename
-#         if os.path.isfile(image_path):
-#             print(image_path)
-#             im = Image.open(image_path)
-#             t, e = os.path.splitext(image_path)
-#             imResize = im.resize((64,64), Image.ANTIALIAS).convert('RGB')
-#             # imResize.save(t + '_resized.jpg', 'JPEG', quality=90)
-#
-#             model = load_model("models/mpl100epochs/model.keras.keras")
-#
-#             result = imageClassification(imResize, model)
-#             print(result)
-#
-#         return render_template("successimage.html", name=f.filename)
+@app.route('/selectModel', methods=['GET'])
+@cross_origin()
+def selectModel():
+    if request.method == 'GET':
+        filenames = os.listdir("./models")  # get all files' and folders' names in the current directory
+        modelList = {}
+        count = 0;
+        for filename in filenames:  # loop through all the files and folders
+            if os.path.isdir(
+                    os.path.join(os.path.abspath("./models"),
+                                 filename)):  # check whether the current object is a folder or not
+                modelList[count] = filename
+                count+=1
+        return modelList
 
+
+@app.route('/displayAccuracy/<string:model>', methods=['GET'])
+@cross_origin()
+def displayAccuracy(model):
+    if request.method == 'GET':
+        path = "models/%s/curve/accuracy.png" % (model)
+        return send_file(path, mimetype='image/PNG')
+
+
+@app.route('/displayLoss/<string:model>', methods=['GET'])
+@cross_origin()
+def displayLoss(model):
+    if request.method == 'GET':
+        path = "models/%s/curve/loss.png" % (model)
+        return send_file(path, mimetype='image/PNG')
 
 
 if __name__ == "__main__":
